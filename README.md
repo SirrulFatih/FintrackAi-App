@@ -87,6 +87,12 @@ Build APK debug:
 flutter build apk --debug
 ```
 
+Build APK release per ABI:
+
+```bash
+flutter build apk --release --split-per-abi
+```
+
 Build web:
 
 ```bash
