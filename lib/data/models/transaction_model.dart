@@ -112,7 +112,7 @@ class TransactionModelAdapter extends TypeAdapter<TransactionModel> {
       title: fields[1] as String,
       amount: parsedAmount,
       type: parsedType,
-      category: (fields[5] as String?) ?? 'Lainnya',
+      category: (fields[5] as String?) ?? '',
       date: fields[4] as DateTime,
     );
   }

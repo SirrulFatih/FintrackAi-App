@@ -48,7 +48,6 @@ class ChatbotController extends GetxController {
               'title': item.title,
               'amount': item.amount,
               'type': item.type.apiValue,
-              'category': item.category,
               'date': item.date.toIso8601String(),
             },
           )

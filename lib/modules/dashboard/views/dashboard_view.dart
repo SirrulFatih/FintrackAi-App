@@ -70,7 +70,7 @@ class DashboardPage extends GetView<TransactionController> {
                       const SizedBox(height: 10),
                       _InsightStrip(
                         transactionCount: controller.transactions.length,
-                        topExpenseCategory: controller.topExpenseCategory,
+                        balance: controller.balance,
                       ),
                       const SizedBox(height: 16),
                       _SearchField(
@@ -322,19 +322,16 @@ class _MetricTile extends StatelessWidget {
 }
 
 class _InsightStrip extends StatelessWidget {
-  const _InsightStrip({
-    required this.transactionCount,
-    required this.topExpenseCategory,
-  });
+  const _InsightStrip({required this.transactionCount, required this.balance});
 
   final int transactionCount;
-  final String? topExpenseCategory;
+  final double balance;
 
   @override
   Widget build(BuildContext context) {
-    final String insight = topExpenseCategory == null
-        ? 'Belum ada kategori pengeluaran dominan.'
-        : 'Pengeluaran terbesar ada di $topExpenseCategory.';
+    final String insight = balance >= 0
+        ? 'Saldo kamu masih positif.'
+        : 'Pengeluaran sudah melewati pemasukan.';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -374,7 +371,7 @@ class _SearchField extends StatelessWidget {
       onChanged: onChanged,
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
-        hintText: 'Cari judul atau kategori',
+        hintText: 'Cari judul transaksi',
         prefixIcon: const Icon(Icons.search_rounded),
         suffixIcon: IconButton(
           onPressed: onClear,
@@ -426,17 +423,6 @@ class _TransactionTile extends StatelessWidget {
 
   final TransactionModel transaction;
 
-  IconData _categoryIcon(String category) {
-    final String value = category.toLowerCase();
-    if (value.contains('makan')) return Icons.restaurant_rounded;
-    if (value.contains('transport')) return Icons.directions_car_rounded;
-    if (value.contains('gaji')) return Icons.payments_rounded;
-    if (value.contains('belanja')) return Icons.shopping_bag_rounded;
-    if (value.contains('tagihan')) return Icons.request_quote_rounded;
-    if (value.contains('hiburan')) return Icons.movie_rounded;
-    return Icons.category_rounded;
-  }
-
   @override
   Widget build(BuildContext context) {
     final bool isIncome = transaction.type == TransactionType.income;
@@ -451,7 +437,12 @@ class _TransactionTile extends StatelessWidget {
         leading: CircleAvatar(
           radius: 22,
           backgroundColor: amountColor.withValues(alpha: 0.12),
-          child: Icon(_categoryIcon(transaction.category), color: amountColor),
+          child: Icon(
+            isIncome
+                ? Icons.arrow_upward_rounded
+                : Icons.arrow_downward_rounded,
+            color: amountColor,
+          ),
         ),
         title: Text(
           transaction.title,
@@ -460,7 +451,7 @@ class _TransactionTile extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
         subtitle: Text(
-          '${transaction.category} | ${AppFormatter.compactDate(transaction.date)}',
+          AppFormatter.compactDate(transaction.date),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

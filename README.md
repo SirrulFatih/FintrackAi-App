@@ -1,6 +1,6 @@
 # FinTrack AI
 
-FinTrack AI adalah aplikasi pencatat keuangan pribadi berbasis Flutter. Aplikasi ini membantu pengguna mencatat pemasukan dan pengeluaran, melihat ringkasan saldo, memantau kategori pengeluaran terbesar, serta bertanya ke asisten AI tentang kondisi keuangan dari data transaksi yang tersimpan.
+FinTrack AI adalah aplikasi pencatat keuangan pribadi berbasis Flutter. Aplikasi ini membantu pengguna mencatat pemasukan dan pengeluaran, melihat ringkasan saldo, memantau transaksi terbesar, serta bertanya ke asisten AI tentang kondisi keuangan dari data transaksi yang tersimpan.
 
 ## Fitur Utama
 
@@ -8,8 +8,8 @@ FinTrack AI adalah aplikasi pencatat keuangan pribadi berbasis Flutter. Aplikasi
 - Pencatatan transaksi pemasukan dan pengeluaran.
 - Edit dan hapus transaksi.
 - Filter transaksi berdasarkan tipe.
-- Pencarian transaksi berdasarkan judul atau kategori.
-- Insight kategori pengeluaran terbesar.
+- Pencarian transaksi berdasarkan judul.
+- Insight saldo dan kondisi transaksi.
 - AI Assistant untuk ringkasan dan saran keuangan.
 - Fallback analisis lokal saat API AI eksternal tidak tersedia.
 - Penyimpanan lokal menggunakan Hive.
@@ -50,7 +50,7 @@ AI Assistant menggunakan endpoint:
 https://rynekoo-api.hf.space/text.gen/ai4chat
 ```
 
-Aplikasi mengirim konteks transaksi ke AI setiap kali pengguna bertanya. Konteks yang dikirim meliputi total pemasukan, total pengeluaran, saldo, kategori pengeluaran utama, dan transaksi terbaru.
+Aplikasi mengirim konteks transaksi ke AI setiap kali pengguna bertanya. Konteks yang dikirim meliputi total pemasukan, total pengeluaran, saldo, dan transaksi terbaru.
 
 Jika endpoint AI mengembalikan error, aplikasi tetap memberi jawaban menggunakan analisis lokal dari data transaksi yang tersedia.
 

@@ -20,7 +20,6 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _categoryController = TextEditingController();
 
   late final TransactionModel? _editingTransaction;
   bool _isSubmitting = false;
@@ -35,14 +34,12 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
     _amountController.text = transaction == null
         ? ''
         : transaction.amount.toStringAsFixed(0);
-    _categoryController.text = transaction?.category ?? '';
   }
 
   @override
   void dispose() {
     _titleController.dispose();
     _amountController.dispose();
-    _categoryController.dispose();
     super.dispose();
   }
 
@@ -80,7 +77,6 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
         existingTransaction: _editingTransaction,
         title: _titleController.text,
         amountInput: _amountController.text,
-        category: _categoryController.text,
       );
     } finally {
       if (mounted) {
@@ -190,36 +186,6 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                         ),
                       );
                     },
-              ),
-              const SizedBox(height: 18),
-              TextFormField(
-                controller: _categoryController,
-                decoration: const InputDecoration(
-                  labelText: 'Kategori',
-                  prefixIcon: Icon(Icons.category_outlined),
-                ),
-                textInputAction: TextInputAction.done,
-                validator: (String? value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Kategori wajib diisi.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 10),
-              Obx(
-                () => Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _controller.categorySuggestions.map((String item) {
-                    return ActionChip(
-                      label: Text(item),
-                      onPressed: () {
-                        _categoryController.text = item;
-                      },
-                    );
-                  }).toList(),
-                ),
               ),
               const SizedBox(height: 18),
               Obx(

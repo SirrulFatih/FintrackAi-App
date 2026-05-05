@@ -129,30 +129,19 @@ Belum ada transaksi tersimpan di aplikasi.
 
     double totalIncome = 0;
     double totalExpense = 0;
-    final Map<String, double> expenseByCategory = <String, double>{};
 
     for (final Map<String, dynamic> item in transactions) {
       final double amount = _readAmount(item['amount']);
       final String type = '${item['type']}'.toLowerCase();
-      final String category = '${item['category'] ?? 'Lainnya'}';
 
       if (type == 'income') {
         totalIncome += amount;
       } else if (type == 'expense') {
         totalExpense += amount;
-        expenseByCategory[category] =
-            (expenseByCategory[category] ?? 0) + amount;
       }
     }
 
     final double balance = totalIncome - totalExpense;
-    final List<MapEntry<String, double>> topExpenses =
-        expenseByCategory.entries.toList()
-          ..sort((MapEntry<String, double> a, MapEntry<String, double> b) {
-            return b.value.compareTo(a.value);
-          });
-    final Iterable<MapEntry<String, double>> visibleTopExpenses = topExpenses
-        .take(5);
     final Iterable<Map<String, dynamic>> recentTransactions = transactions.take(
       25,
     );
@@ -163,7 +152,6 @@ Konteks FinTrack:
 - Total pemasukan: Rp ${totalIncome.toStringAsFixed(0)}
 - Total pengeluaran: Rp ${totalExpense.toStringAsFixed(0)}
 - Saldo: Rp ${balance.toStringAsFixed(0)}
-- Pengeluaran per kategori utama: ${visibleTopExpenses.map((MapEntry<String, double> entry) => '${entry.key}: Rp ${entry.value.toStringAsFixed(0)}').join(', ')}
 - Transaksi terbaru:
 ${recentTransactions.map(_formatTransactionForPrompt).join('\n')}
 ''';
@@ -171,7 +159,7 @@ ${recentTransactions.map(_formatTransactionForPrompt).join('\n')}
 
   String _formatTransactionForPrompt(Map<String, dynamic> item) {
     return '- ${item['date']}: ${item['title']} | ${item['type']} | '
-        '${item['category']} | Rp ${_readAmount(item['amount']).toStringAsFixed(0)}';
+        'Rp ${_readAmount(item['amount']).toStringAsFixed(0)}';
   }
 
   double _readAmount(dynamic rawAmount) {
@@ -194,63 +182,65 @@ ${recentTransactions.map(_formatTransactionForPrompt).join('\n')}
       return '''
 $serverNote, jadi saya pakai analisis lokal FinTrack.
 
-Belum ada transaksi tersimpan. Mulai catat minimal pemasukan dan pengeluaran harian, lalu saya bisa membaca saldo, kategori paling boros, dan memberi saran yang lebih tepat.
+Belum ada transaksi tersimpan. Mulai catat minimal pemasukan dan pengeluaran harian, lalu saya bisa membaca saldo dan memberi saran yang lebih tepat.
 
 Saran cepat:
-- Catat pengeluaran kecil seperti makan, transportasi, dan belanja.
-- Pakai kategori yang konsisten.
-- Cek ulang kategori terbesar setelah beberapa transaksi masuk.
+- Catat pemasukan dan pengeluaran di hari yang sama.
+- Pisahkan judul transaksi dengan jelas.
+- Cek saldo setelah beberapa transaksi masuk.
 ''';
     }
 
     double totalIncome = 0;
     double totalExpense = 0;
-    final Map<String, double> expenseByCategory = <String, double>{};
+    Map<String, dynamic>? biggestExpense;
 
     for (final Map<String, dynamic> item in transactions) {
       final double amount = _readAmount(item['amount']);
       final String type = '${item['type']}'.toLowerCase();
-      final String category = '${item['category'] ?? 'Lainnya'}';
 
       if (type == 'income') {
         totalIncome += amount;
       } else if (type == 'expense') {
         totalExpense += amount;
-        expenseByCategory[category] =
-            (expenseByCategory[category] ?? 0) + amount;
+        if (biggestExpense == null ||
+            amount > _readAmount(biggestExpense['amount'])) {
+          biggestExpense = item;
+        }
       }
     }
 
     final double balance = totalIncome - totalExpense;
-    final List<MapEntry<String, double>> categories =
-        expenseByCategory.entries.toList()
-          ..sort((MapEntry<String, double> a, MapEntry<String, double> b) {
-            return b.value.compareTo(a.value);
-          });
-    final MapEntry<String, double>? topCategory = categories.isEmpty
-        ? null
-        : categories.first;
     final String normalizedMessage = message.toLowerCase();
 
-    if (normalizedMessage.contains('boros') ||
-        normalizedMessage.contains('kategori')) {
-      if (topCategory == null) {
+    if (normalizedMessage.contains('boros')) {
+      if (totalExpense <= 0) {
         return '''
 $serverNote, jadi saya pakai analisis lokal FinTrack.
 
-Belum ada transaksi pengeluaran. Setelah ada pengeluaran, saya bisa menentukan kategori paling boros.
+Belum ada transaksi pengeluaran. Setelah ada pengeluaran, saya bisa menilai apakah pengeluaranmu mulai boros.
 ''';
       }
+
+      final double expenseRatio = totalIncome <= 0
+          ? 1
+          : (totalExpense / totalIncome);
+      final String status = expenseRatio >= 0.8
+          ? 'cukup tinggi'
+          : expenseRatio >= 0.5
+          ? 'perlu dipantau'
+          : 'masih terkendali';
 
       return '''
 $serverNote, jadi saya pakai analisis lokal FinTrack.
 
-Kategori paling boros saat ini adalah ${topCategory.key} dengan total ${AppFormatter.currency(topCategory.value)}.
+Pengeluaranmu saat ini $status.
 
 Ringkasan:
 - Pemasukan: ${AppFormatter.currency(totalIncome)}
 - Pengeluaran: ${AppFormatter.currency(totalExpense)}
 - Saldo: ${AppFormatter.currency(balance)}
+${biggestExpense == null ? '' : '- Pengeluaran terbesar: ${biggestExpense['title']} (${AppFormatter.currency(_readAmount(biggestExpense['amount']))})'}
 ''';
     }
 
@@ -262,10 +252,10 @@ Ringkasan kondisi keuangan:
 - Pengeluaran: ${AppFormatter.currency(totalExpense)}
 - Saldo: ${AppFormatter.currency(balance)}
 
-${topCategory == null ? 'Belum ada kategori pengeluaran yang bisa dianalisis.' : 'Kategori pengeluaran terbesar: ${topCategory.key} (${AppFormatter.currency(topCategory.value)}).'}
+${biggestExpense == null ? 'Belum ada transaksi pengeluaran yang bisa dianalisis.' : 'Pengeluaran terbesar: ${biggestExpense['title']} (${AppFormatter.currency(_readAmount(biggestExpense['amount']))}).'}
 
 Saran hemat minggu ini:
-- Batasi kategori terbesar dulu karena dampaknya paling terasa.
+- Pantau transaksi pengeluaran terbesar dulu karena dampaknya paling terasa.
 - Catat transaksi kecil di hari yang sama.
 - Sisihkan saldo positif ke tabungan sebelum dipakai belanja.
 ''';

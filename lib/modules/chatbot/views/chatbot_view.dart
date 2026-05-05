@@ -23,7 +23,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
   static const List<String> _quickPrompts = <String>[
     'Ringkas kondisi keuanganku',
-    'Kategori mana yang boros?',
+    'Apakah pengeluaranku boros?',
     'Beri saran hemat minggu ini',
   ];
 
@@ -125,11 +125,18 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
 }
 
-class _AssistantHeader extends StatelessWidget {
+class _AssistantHeader extends StatefulWidget {
   const _AssistantHeader({required this.prompts, required this.onPromptTap});
 
   final List<String> prompts;
   final ValueChanged<String> onPromptTap;
+
+  @override
+  State<_AssistantHeader> createState() => _AssistantHeaderState();
+}
+
+class _AssistantHeaderState extends State<_AssistantHeader> {
+  bool _isExpanded = true;
 
   @override
   Widget build(BuildContext context) {
@@ -151,19 +158,41 @@ class _AssistantHeader extends StatelessWidget {
                     ),
                   ),
                 ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _isExpanded = !_isExpanded;
+                    });
+                  },
+                  icon: Icon(
+                    _isExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                  ),
+                  tooltip: _isExpanded ? 'Tutup insight' : 'Buka insight',
+                ),
               ],
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: prompts.map((String prompt) {
-                return ActionChip(
-                  avatar: const Icon(Icons.bolt_rounded, size: 18),
-                  label: Text(prompt),
-                  onPressed: () => onPromptTap(prompt),
-                );
-              }).toList(),
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: widget.prompts.map((String prompt) {
+                    return ActionChip(
+                      avatar: const Icon(Icons.bolt_rounded, size: 18),
+                      label: Text(prompt),
+                      onPressed: () => widget.onPromptTap(prompt),
+                    );
+                  }).toList(),
+                ),
+              ),
+              crossFadeState: _isExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 180),
             ),
           ],
         ),

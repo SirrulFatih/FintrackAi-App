@@ -18,30 +18,6 @@ class TransactionController extends GetxController {
   final Rx<DateTime> selectedDate = DateTime.now().obs;
   final RxBool isSaving = false.obs;
 
-  static const List<String> incomeCategories = <String>[
-    'Gaji',
-    'Bonus',
-    'Freelance',
-    'Investasi',
-    'Lainnya',
-  ];
-
-  static const List<String> expenseCategories = <String>[
-    'Makanan',
-    'Transportasi',
-    'Belanja',
-    'Tagihan',
-    'Hiburan',
-    'Kesehatan',
-    'Lainnya',
-  ];
-
-  List<String> get categorySuggestions {
-    return selectedType.value == TransactionType.income
-        ? incomeCategories
-        : expenseCategories;
-  }
-
   double get totalIncome {
     return transactions
         .where((TransactionModel item) => item.type == TransactionType.income)
@@ -76,35 +52,9 @@ class TransactionController extends GetxController {
     return transactions.where((TransactionModel item) {
       final bool matchesType = type == null || item.type == type;
       final bool matchesQuery =
-          query.isEmpty ||
-          item.title.toLowerCase().contains(query) ||
-          item.category.toLowerCase().contains(query);
+          query.isEmpty || item.title.toLowerCase().contains(query);
       return matchesType && matchesQuery;
     }).toList();
-  }
-
-  Map<String, double> get expenseByCategory {
-    final Map<String, double> totals = <String, double>{};
-    for (final TransactionModel item in transactions) {
-      if (item.type != TransactionType.expense) {
-        continue;
-      }
-      totals[item.category] = (totals[item.category] ?? 0) + item.amount;
-    }
-
-    final List<MapEntry<String, double>> entries = totals.entries.toList()
-      ..sort((MapEntry<String, double> a, MapEntry<String, double> b) {
-        return b.value.compareTo(a.value);
-      });
-
-    return Map<String, double>.fromEntries(entries);
-  }
-
-  String? get topExpenseCategory {
-    if (expenseByCategory.isEmpty) {
-      return null;
-    }
-    return expenseByCategory.entries.first.key;
   }
 
   @override
@@ -187,23 +137,12 @@ class TransactionController extends GetxController {
     required TransactionModel? existingTransaction,
     required String title,
     required String amountInput,
-    required String category,
   }) async {
     final String cleanTitle = title.trim();
     if (cleanTitle.isEmpty) {
       Get.snackbar(
         'Validasi',
         'Judul transaksi wajib diisi.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return false;
-    }
-
-    final String cleanCategory = category.trim();
-    if (cleanCategory.isEmpty) {
-      Get.snackbar(
-        'Validasi',
-        'Kategori wajib diisi.',
         snackPosition: SnackPosition.BOTTOM,
       );
       return false;
@@ -224,7 +163,7 @@ class TransactionController extends GetxController {
       title: cleanTitle,
       amount: amount,
       type: selectedType.value,
-      category: cleanCategory,
+      category: existingTransaction?.category ?? '',
       date: selectedDate.value,
     );
 
