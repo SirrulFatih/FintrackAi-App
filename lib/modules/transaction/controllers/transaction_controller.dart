@@ -4,6 +4,44 @@ import 'package:uuid/uuid.dart';
 import '../../../data/models/transaction_model.dart';
 import '../../../data/repositories/transaction_repository.dart';
 
+enum TransactionPeriod { day, month, year }
+
+extension TransactionPeriodX on TransactionPeriod {
+  String get label {
+    return switch (this) {
+      TransactionPeriod.day => 'Hari',
+      TransactionPeriod.month => 'Bulan',
+      TransactionPeriod.year => 'Tahun',
+    };
+  }
+}
+
+class DailyExpenseTotal {
+  const DailyExpenseTotal({required this.date, required this.total});
+
+  final DateTime date;
+  final double total;
+}
+
+class TransactionGroup {
+  const TransactionGroup({
+    required this.period,
+    required this.startDate,
+    required this.transactions,
+    required this.totalIncome,
+    required this.totalExpense,
+  });
+
+  final TransactionPeriod period;
+  final DateTime startDate;
+  final List<TransactionModel> transactions;
+  final double totalIncome;
+  final double totalExpense;
+
+  double get balance => totalIncome - totalExpense;
+  int get transactionCount => transactions.length;
+}
+
 class TransactionController extends GetxController {
   TransactionController(this._repository);
 
@@ -14,6 +52,7 @@ class TransactionController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxString searchQuery = ''.obs;
   final Rxn<TransactionType> activeType = Rxn<TransactionType>();
+  final Rx<TransactionPeriod> selectedPeriod = TransactionPeriod.day.obs;
   final Rx<TransactionType> selectedType = TransactionType.expense.obs;
   final Rx<DateTime> selectedDate = DateTime.now().obs;
   final RxBool isSaving = false.obs;
@@ -38,6 +77,21 @@ class TransactionController extends GetxController {
 
   double get balance => totalIncome - totalExpense;
 
+  double get todayExpenseTotal {
+    final DateTime today = _dateOnly(DateTime.now());
+
+    return transactions
+        .where(
+          (TransactionModel item) =>
+              item.type == TransactionType.expense &&
+              _dateOnly(item.date) == today,
+        )
+        .fold<double>(
+          0,
+          (double sum, TransactionModel item) => sum + item.amount,
+        );
+  }
+
   double get savingsRate {
     if (totalIncome <= 0) {
       return 0;
@@ -55,6 +109,82 @@ class TransactionController extends GetxController {
           query.isEmpty || item.title.toLowerCase().contains(query);
       return matchesType && matchesQuery;
     }).toList();
+  }
+
+  List<TransactionGroup> get groupedTransactions {
+    final TransactionPeriod period = selectedPeriod.value;
+    final Map<DateTime, List<TransactionModel>> groupedItems =
+        <DateTime, List<TransactionModel>>{};
+
+    for (final TransactionModel item in filteredTransactions) {
+      final DateTime key = _periodStart(item.date, period);
+      groupedItems.putIfAbsent(key, () => <TransactionModel>[]).add(item);
+    }
+
+    final List<DateTime> sortedKeys = groupedItems.keys.toList()
+      ..sort((DateTime a, DateTime b) => b.compareTo(a));
+
+    return sortedKeys
+        .map((DateTime key) {
+          final List<TransactionModel> items = groupedItems[key]!
+            ..sort(
+              (TransactionModel a, TransactionModel b) =>
+                  b.date.compareTo(a.date),
+            );
+
+          final double income = items
+              .where(
+                (TransactionModel item) => item.type == TransactionType.income,
+              )
+              .fold<double>(
+                0,
+                (double sum, TransactionModel item) => sum + item.amount,
+              );
+          final double expense = items
+              .where(
+                (TransactionModel item) => item.type == TransactionType.expense,
+              )
+              .fold<double>(
+                0,
+                (double sum, TransactionModel item) => sum + item.amount,
+              );
+
+          return TransactionGroup(
+            period: period,
+            startDate: key,
+            transactions: items,
+            totalIncome: income,
+            totalExpense: expense,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  List<DailyExpenseTotal> get dailyExpenseTotals {
+    final Map<DateTime, double> totals = <DateTime, double>{};
+
+    for (final TransactionModel item in transactions) {
+      if (item.type != TransactionType.expense) {
+        continue;
+      }
+
+      final DateTime key = _dateOnly(item.date);
+      totals.update(
+        key,
+        (double value) => value + item.amount,
+        ifAbsent: () => item.amount,
+      );
+    }
+
+    final List<DateTime> sortedKeys = totals.keys.toList()
+      ..sort((DateTime a, DateTime b) => a.compareTo(b));
+
+    return sortedKeys
+        .map(
+          (DateTime date) =>
+              DailyExpenseTotal(date: date, total: totals[date] ?? 0),
+        )
+        .toList(growable: false);
   }
 
   @override
@@ -133,6 +263,10 @@ class TransactionController extends GetxController {
     activeType.value = type;
   }
 
+  void setPeriod(TransactionPeriod period) {
+    selectedPeriod.value = period;
+  }
+
   Future<bool> submit({
     required TransactionModel? existingTransaction,
     required String title,
@@ -202,5 +336,17 @@ class TransactionController extends GetxController {
     }
 
     return double.tryParse(digitsOnly);
+  }
+
+  DateTime _periodStart(DateTime value, TransactionPeriod period) {
+    return switch (period) {
+      TransactionPeriod.day => _dateOnly(value),
+      TransactionPeriod.month => DateTime(value.year, value.month),
+      TransactionPeriod.year => DateTime(value.year),
+    };
+  }
+
+  DateTime _dateOnly(DateTime value) {
+    return DateTime(value.year, value.month, value.day);
   }
 }

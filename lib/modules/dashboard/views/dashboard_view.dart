@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -27,6 +29,8 @@ class DashboardPage extends GetView<TransactionController> {
         child: Obx(() {
           final List<TransactionModel> visibleTransactions =
               controller.filteredTransactions;
+          final List<TransactionGroup> groupedTransactions =
+              controller.groupedTransactions;
 
           return RefreshIndicator(
             onRefresh: controller.loadTransactions,
@@ -68,6 +72,13 @@ class DashboardPage extends GetView<TransactionController> {
                         ],
                       ),
                       const SizedBox(height: 10),
+                      _TodayExpenseBanner(
+                        date: DateTime.now(),
+                        total: controller.todayExpenseTotal,
+                      ),
+                      const SizedBox(height: 10),
+                      _DailyExpenseChart(totals: controller.dailyExpenseTotals),
+                      const SizedBox(height: 10),
                       _InsightStrip(
                         transactionCount: controller.transactions.length,
                         balance: controller.balance,
@@ -82,12 +93,17 @@ class DashboardPage extends GetView<TransactionController> {
                         selectedType: controller.activeType.value,
                         onChanged: controller.setActiveType,
                       ),
+                      const SizedBox(height: 12),
+                      _PeriodSelector(
+                        selectedPeriod: controller.selectedPeriod.value,
+                        onChanged: controller.setPeriod,
+                      ),
                       const SizedBox(height: 18),
                       Row(
                         children: <Widget>[
                           Expanded(
                             child: Text(
-                              'Transaksi',
+                              'Transaksi per ${controller.selectedPeriod.value.label.toLowerCase()}',
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.w800),
                             ),
@@ -120,20 +136,16 @@ class DashboardPage extends GetView<TransactionController> {
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                     sliver: SliverList.separated(
-                      itemCount: visibleTransactions.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemCount: groupedTransactions.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 18),
                       itemBuilder: (BuildContext context, int index) {
-                        final TransactionModel transaction =
-                            visibleTransactions[index];
-                        return Dismissible(
-                          key: ValueKey<String>(transaction.id),
-                          direction: DismissDirection.endToStart,
-                          background: const _DeleteBackground(),
-                          confirmDismiss: (_) => _confirmDelete(context),
-                          onDismissed: (_) {
-                            controller.deleteTransaction(transaction.id);
-                          },
-                          child: _TransactionTile(transaction: transaction),
+                        final TransactionGroup group =
+                            groupedTransactions[index];
+
+                        return _TransactionGroupSection(
+                          group: group,
+                          onConfirmDelete: () => _confirmDelete(context),
+                          onDelete: controller.deleteTransaction,
                         );
                       },
                     ),
@@ -321,6 +333,259 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
+class _TodayExpenseBanner extends StatelessWidget {
+  const _TodayExpenseBanner({required this.date, required this.total});
+
+  final DateTime date;
+  final double total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.expense.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.expense.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppTheme.expense.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.today_rounded, color: AppTheme.expense),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Keluar hari ini',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.muted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  AppFormatter.date(date),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 150),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                AppFormatter.currency(total),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppTheme.expense,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DailyExpenseChart extends StatelessWidget {
+  const _DailyExpenseChart({required this.totals});
+
+  final List<DailyExpenseTotal> totals;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<DailyExpenseTotal> visibleTotals = totals.length > 14
+        ? totals.sublist(totals.length - 14)
+        : totals;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                const Icon(Icons.bar_chart_rounded, color: AppTheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Grafik Pengeluaran Harian',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                if (visibleTotals.isNotEmpty)
+                  Text(
+                    '${visibleTotals.length} hari',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppTheme.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (visibleTotals.isEmpty)
+              SizedBox(
+                height: 150,
+                child: Center(
+                  child: Text(
+                    'Belum ada pengeluaran',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                height: 190,
+                child: LayoutBuilder(
+                  builder: (BuildContext context, BoxConstraints constraints) {
+                    final double chartWidth = math.max(
+                      constraints.maxWidth,
+                      visibleTotals.length * 56,
+                    );
+
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: CustomPaint(
+                        size: Size(chartWidth, constraints.maxHeight),
+                        painter: _DailyExpenseChartPainter(
+                          totals: visibleTotals,
+                          textStyle: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DailyExpenseChartPainter extends CustomPainter {
+  const _DailyExpenseChartPainter({
+    required this.totals,
+    required this.textStyle,
+  });
+
+  final List<DailyExpenseTotal> totals;
+  final TextStyle? textStyle;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (totals.isEmpty) {
+      return;
+    }
+
+    final double maxTotal = totals
+        .map((DailyExpenseTotal item) => item.total)
+        .reduce(math.max);
+    final double chartMax = maxTotal <= 0 ? 1 : maxTotal;
+    const double top = 12;
+    const double bottomLabelHeight = 42;
+    const double left = 8;
+    const double right = 8;
+    final double chartBottom = size.height - bottomLabelHeight;
+    final double chartHeight = chartBottom - top;
+    final double chartWidth = size.width - left - right;
+    final double slotWidth = chartWidth / totals.length;
+
+    final Paint gridPaint = Paint()
+      ..color = AppTheme.border
+      ..strokeWidth = 1;
+    final Paint barPaint = Paint()..color = AppTheme.expense;
+    final Paint mutedBarPaint = Paint()
+      ..color = AppTheme.expense.withValues(alpha: 0.32);
+
+    for (int i = 0; i <= 3; i++) {
+      final double y = top + (chartHeight / 3) * i;
+      canvas.drawLine(
+        Offset(left, y),
+        Offset(size.width - right, y),
+        gridPaint,
+      );
+    }
+
+    for (int index = 0; index < totals.length; index++) {
+      final DailyExpenseTotal item = totals[index];
+      final double normalizedHeight = (item.total / chartMax) * chartHeight;
+      final double barWidth = math.min(30, slotWidth * 0.52);
+      final double x =
+          left + (slotWidth * index) + ((slotWidth - barWidth) / 2);
+      final double barTop = chartBottom - normalizedHeight;
+      final RRect rect = RRect.fromLTRBR(
+        x,
+        barTop,
+        x + barWidth,
+        chartBottom,
+        const Radius.circular(5),
+      );
+
+      canvas.drawRRect(rect, item.total == maxTotal ? barPaint : mutedBarPaint);
+      _paintText(
+        canvas,
+        text: AppFormatter.compactDate(item.date),
+        center: Offset(x + (barWidth / 2), chartBottom + 14),
+        maxWidth: slotWidth,
+        color: AppTheme.muted,
+      );
+    }
+  }
+
+  void _paintText(
+    Canvas canvas, {
+    required String text,
+    required Offset center,
+    required double maxWidth,
+    required Color color,
+  }) {
+    final TextPainter painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: (textStyle ?? const TextStyle(fontSize: 11)).copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+      ellipsis: '',
+    )..layout(maxWidth: maxWidth);
+
+    painter.paint(canvas, Offset(center.dx - (painter.width / 2), center.dy));
+  }
+
+  @override
+  bool shouldRepaint(covariant _DailyExpenseChartPainter oldDelegate) {
+    return oldDelegate.totals != totals || oldDelegate.textStyle != textStyle;
+  }
+}
+
 class _InsightStrip extends StatelessWidget {
   const _InsightStrip({required this.transactionCount, required this.balance});
 
@@ -414,6 +679,214 @@ class _FilterBar extends StatelessWidget {
           onSelected: (_) => onChanged(TransactionType.expense),
         ),
       ],
+    );
+  }
+}
+
+class _PeriodSelector extends StatelessWidget {
+  const _PeriodSelector({
+    required this.selectedPeriod,
+    required this.onChanged,
+  });
+
+  final TransactionPeriod selectedPeriod;
+  final ValueChanged<TransactionPeriod> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<TransactionPeriod>(
+      segments: const <ButtonSegment<TransactionPeriod>>[
+        ButtonSegment<TransactionPeriod>(
+          value: TransactionPeriod.day,
+          icon: Icon(Icons.calendar_view_day_rounded),
+          label: Text('Hari'),
+        ),
+        ButtonSegment<TransactionPeriod>(
+          value: TransactionPeriod.month,
+          icon: Icon(Icons.calendar_view_month_rounded),
+          label: Text('Bulan'),
+        ),
+        ButtonSegment<TransactionPeriod>(
+          value: TransactionPeriod.year,
+          icon: Icon(Icons.event_available_rounded),
+          label: Text('Tahun'),
+        ),
+      ],
+      selected: <TransactionPeriod>{selectedPeriod},
+      onSelectionChanged: (Set<TransactionPeriod> value) {
+        onChanged(value.first);
+      },
+    );
+  }
+}
+
+class _TransactionGroupSection extends StatelessWidget {
+  const _TransactionGroupSection({
+    required this.group,
+    required this.onConfirmDelete,
+    required this.onDelete,
+  });
+
+  final TransactionGroup group;
+  final Future<bool> Function() onConfirmDelete;
+  final ValueChanged<String> onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> transactionRows = <Widget>[];
+
+    for (final TransactionModel transaction in group.transactions) {
+      if (transactionRows.isNotEmpty) {
+        transactionRows.add(const SizedBox(height: 8));
+      }
+
+      transactionRows.add(
+        Dismissible(
+          key: ValueKey<String>(transaction.id),
+          direction: DismissDirection.endToStart,
+          background: const _DeleteBackground(),
+          confirmDismiss: (_) => onConfirmDelete(),
+          onDismissed: (_) => onDelete(transaction.id),
+          child: _TransactionTile(transaction: transaction),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _TransactionGroupHeader(group: group),
+        const SizedBox(height: 8),
+        ...transactionRows,
+      ],
+    );
+  }
+}
+
+class _TransactionGroupHeader extends StatelessWidget {
+  const _TransactionGroupHeader({required this.group});
+
+  final TransactionGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.panel,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  _groupTitle(group),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '${group.transactionCount} transaksi',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppTheme.muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              _GroupTotalChip(
+                label: 'Keluar',
+                value: AppFormatter.currency(group.totalExpense),
+                color: AppTheme.expense,
+                icon: Icons.arrow_downward_rounded,
+              ),
+              _GroupTotalChip(
+                label: 'Masuk',
+                value: AppFormatter.currency(group.totalIncome),
+                color: AppTheme.income,
+                icon: Icons.arrow_upward_rounded,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _groupTitle(TransactionGroup group) {
+    return switch (group.period) {
+      TransactionPeriod.day => AppFormatter.date(group.startDate),
+      TransactionPeriod.month => AppFormatter.monthYear(group.startDate),
+      TransactionPeriod.year => AppFormatter.year(group.startDate),
+    };
+  }
+}
+
+class _GroupTotalChip extends StatelessWidget {
+  const _GroupTotalChip({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 170),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

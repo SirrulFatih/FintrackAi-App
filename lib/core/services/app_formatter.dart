@@ -9,6 +9,10 @@ class AppFormatter {
 
   static final DateFormat _dateFormatter = DateFormat('dd MMM yyyy', 'id_ID');
   static final DateFormat _compactDateFormatter = DateFormat('d MMM', 'id_ID');
+  static final DateFormat _monthYearFormatter = DateFormat(
+    'MMMM yyyy',
+    'id_ID',
+  );
   static final DateFormat _timeFormatter = DateFormat('HH:mm');
 
   static String currency(double value) {
@@ -26,6 +30,14 @@ class AppFormatter {
 
   static String compactDate(DateTime value) {
     return _compactDateFormatter.format(value);
+  }
+
+  static String monthYear(DateTime value) {
+    return _monthYearFormatter.format(value);
+  }
+
+  static String year(DateTime value) {
+    return value.year.toString();
   }
 
   static String time(DateTime value) {
